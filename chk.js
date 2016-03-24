@@ -8,12 +8,12 @@ const hash = function (path, callback) {
       md5sum = crypto.createHash('md5'),
       shasum = crypto.createHash('sha512');
 
-  stream.on('data', function (chunk) {
+  stream.on('data', (chunk) => {
     md5sum.update(chunk, 'utf8');
     shasum.update(chunk, 'utf8');
   });
 
-  stream.on('end', function () {
+  stream.on('end', () => {
     callback({
       md5: md5sum.digest('hex'),
       sha: shasum.digest('hex'),
@@ -75,10 +75,10 @@ var kancolle = {},
     totalSize = 0;
 var walker;
 
-fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
+fs.readFile(process.argv[4] || 'list/shipname', (err, nameList) => {
   if (err) throw err;
   nameList = nameList.toString();
-  nameList.split('\n').forEach(function (name) {
+  nameList.split('\n').forEach((name) => {
     name = name.split(',');
     if (name[0]) {
       namePool[name[0]] = {
@@ -88,7 +88,7 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
     };
   });
 
-  fs.readFile(process.argv[3] || 'kancolle.json', function (err, data) {
+  fs.readFile(process.argv[3] || 'kancolle.json', (err, data) => {
     if (err) throw err;
     let kan = {};
 
@@ -102,9 +102,9 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
     kancolle.core = kan.core || [];
     kancolle.bgm = kan.bgm || [];
 
-    kancolle.ship.forEach(function (i) {
+    kancolle.ship.forEach((i) => {
       swap.ship[i.name] = { ship: {}, voice: {} };
-      i.version.forEach(function (j) {
+      i.version.forEach((j) => {
         swap.ship[i.name].ship[j.sha] = {
           path: j.path,
           size: j.size,
@@ -114,10 +114,10 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
         };
       });
 
-      i.voice.forEach(function (j) {
+      i.voice.forEach((j) => {
         swap.ship[i.name].voice[j.name] = {};
 
-        j.version.forEach(function (k) {
+        j.version.forEach((k) => {
           swap.ship[i.name].voice[j.name][k.sha] = {
             path: k.path,
             size: k.size,
@@ -129,9 +129,9 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
       });
     });
 
-    kancolle.core.forEach(function (i) {
+    kancolle.core.forEach((i) => {
       swap.core[i.name] = {};
-      i.version.forEach(function (j) {
+      i.version.forEach((j) => {
         swap.core[i.name][j.sha] = {
           path: j.path,
           size: j.size,
@@ -142,9 +142,9 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
       });
     });
 
-    kancolle.bgm.forEach(function (i) {
+    kancolle.bgm.forEach((i) => {
       swap.bgm[i.name] = {};
-      i.version.forEach(function (j) {
+      i.version.forEach((j) => {
         swap.bgm[i.name][j.sha] = {
           path: j.path,
           size: j.size,
@@ -157,11 +157,11 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
 
     walker = walk.walk(process.argv[2]);
 
-    walker.on('file', function (root, fileStats, next) {
+    walker.on('file', (root, fileStats, next) => {
       var path = root + '/' + fileStats.name;
       if (fileStats.name.match(/\w*\.\w{3}/)) {
         console.log(path);
-        hash(path, function (hashData) {
+        hash(path, (hashData) => {
           pickup({
             path: [root.replace(/\/\/*\//g, '/'), fileStats.name],
             name: fileStats.name,
@@ -175,7 +175,7 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
       next();
     });
 
-    walker.on('end', function () {
+    walker.on('end', () => {
       kancolle = { ship: [], core: [], bgm: [] };
       for (let i in swap.ship) {
         var ship = {
@@ -238,10 +238,10 @@ fs.readFile(process.argv[4] || 'list/shipname', function (err, nameList) {
         kancolle.bgm.push(bgm);
       };
 
-      fs.writeFile(process.argv[3] || 'kancolle.json', JSON.stringify(kancolle), function (err) {
+      fs.writeFile(process.argv[3] || 'kancolle.json', JSON.stringify(kancolle), (err) => {
         if (err) throw err;
         console.log('done');
-        console.log('total: ' + size / 1048576 + ' mb');
+        console.log('total: ' + totalSize / 1048576 + ' mb');
       });
     });
   });

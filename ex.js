@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('fs');
 
-fs.readFile(process.argv[2] || 'source', function (err, data) {
+fs.readFile(process.argv[2] || 'source', (err, data) => {
   if (err) throw err;
   var kancolle = JSON.parse(data);
 
@@ -21,9 +21,9 @@ fs.readFile(process.argv[2] || 'source', function (err, data) {
     nameList += idPool[shipNameList[i].api_id] + ',' + shipNameList[i].api_id + ',' + shipNameList[i].api_name + ',' + shipNameList[i].api_yomi + '\n';
   };
 
-  fs.writeFile(process.argv[3] || 'list/apikey', shipKey, function (err) {
+  fs.writeFile(process.argv[3] || 'list/apikey', shipKey, (err) => {
     if (err) throw err;
-    fs.writeFile(process.argv[4] || 'list/shipname', nameList, function (err) {
+    fs.writeFile(process.argv[4] || 'list/shipname', nameList, (err) => {
       if (err) throw err;
       console.log('done');
     });
