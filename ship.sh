@@ -3,8 +3,8 @@ time=$(date "+%m%d")
 header="--header=User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36"
 filename="../../../list/apikey"
 backupdir="backup/"
-dir=$backupdir"swf/"
-addr=$dir"swf"$time
+dir=$backupdir"ship/"
+addr=$dir"ship"$time
 
 if [ ! -d $backupdir ]; then
   mkdir $backupdir

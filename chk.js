@@ -55,7 +55,7 @@ const pickup = (stats, callback) => {
       } else if (!swap.core[name][stats.sha]) {
         swap.core[name][stats.sha] = stats;
       };
-    } else if (stats.path[0].match(/swf\d{4}/) || stats.path[0].match(/\/SWF\//)) {
+    } else if (stats.path[0].match(/ship\d{4}/) || stats.path[0].match(/swf\d{4}/) || stats.path[0].match(/\/SWF\//)) {
       let name;
       if (stats.name.match(/\d{1,3}\.swf/)) {
         // old ship
