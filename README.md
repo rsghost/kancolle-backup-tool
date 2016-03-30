@@ -3,7 +3,7 @@ backup tools for kantai collection
 
 
 ## make ship apikey list
-`node extract.js [api_start2 res]`
+`node repl.js [api_start2 res]`
 * `api_start2 res` /kcsapi/api\_start2 response
 
 ## backup

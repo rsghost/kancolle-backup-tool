@@ -6,14 +6,27 @@ const crypto = require('crypto'),
 const backupAddr = process.argv[2] || 'backup';
 const dbAddr = process.argv[3] || 'kancolle.json';
 
-var kancolle = {},
-    status = { locked: 0, end: false },
-    swap = { ship: {}, core: {}, bgm: {} },
-    keyPool = {},
-    idPool = {},
-    mistPool = {},
-    specialPool = {},
-    totalSize = 0;
+var kancolle = {};
+
+var status = {
+  locked: 0,
+  end: false
+};
+
+var map = {
+  key: {},
+  id: {},
+  mist: {},
+  special: {}
+};
+
+var num = {
+  all: 0,
+  origin: 0,
+  input: 0,
+  output: 0,
+  size: 0
+};
 
 const hash = (path, callback) => {
   let stream = fs.createReadStream(path),
@@ -34,98 +47,108 @@ const hash = (path, callback) => {
 };
 
 const pickup = (stats, callback) => {
-  if (stats.name.match(/\w*\.swf/)) {
-    if (stats.path[0].match(/bgm\d{4}/) || stats.path[0].match(/sound_/) || stats.name.match(/bgset/)) {
+  let addInputNum = () => {
+    num.input++;
+  };
+
+  let statsInfo = {
+    path: stats.path,
+    size: stats.size,
+    md5: stats.md5,
+    sha: stats.sha,
+    updated_at: stats.updated_at
+  };
+
+  if (stats.name.match(/\.swf$/)) {
+    if (stats.path[0].match(/\/bgm\//) || stats.name.match(/sound_|bgset/)) {
       // bgm
-      let name = stats.name;
-
-      if (!swap.bgm[name]) {
-        swap.bgm[name] = {};
-        swap.bgm[name][stats.sha] = stats;
-      } else if (!swap.bgm[name][stats.sha]) {
-        swap.bgm[name][stats.sha] = stats;
-      };
-    } else if (stats.path[0].match(/core\d{4}/) || stats.path[0].match(/\/GAMESWF\//)) {
+      swap(['bgm', stats.name, stats.sha], statsInfo, addInputNum);
+    } else if (stats.path[0].match(/\/(core|GAMESWF)\//)) {
       // core
-      let name = stats.name;
-
-      if (!swap.core[name]) {
-        swap.core[name] = {};
-        swap.core[name][stats.sha] = stats;
-      } else if (!swap.core[name][stats.sha]) {
-        swap.core[name][stats.sha] = stats;
-      };
-    } else if (stats.path[0].match(/ship\d{4}/) || stats.path[0].match(/swf\d{4}/) || stats.path[0].match(/\/SWF\//)) {
-      let name;
-      if (stats.name.match(/\d{1,3}\.swf/)) {
+      swap(['core', stats.name, stats.sha], statsInfo, addInputNum);
+    } else if (stats.path[0].match(/\/(ship|swf|SWF)\//)) {
+      let shipname;
+      if (stats.path[0].match(/\/SWF\//)) {
         // old ship
-        if (stats.path[0].match(/\/SWF_(\d{8})/)[1] < 20140131 && mistPool[stats.name.match(/^\d*/)[0]]) {
-          name = mistPool[stats.name.match(/^\d*/)[0]].ship_eng_name;
-        } else if (specialPool[stats.name.match(/^\d*/)[0]]) {
-          name = specialPool[stats.name.match(/^\d*/)[0]].ship_eng_name;
+        let id = stats.name.match(/^\d*/)[0];
+        if (stats.path[0].match(/SWF_(\d{8})/)[1] < 20140131 && map.mist[id]) {
+          shipname = map.mist[id].ship_eng_name;
+        } else if (map.special[id]) {
+          shipname = map.special[id].ship_eng_name;
         } else {
-          name = idPool[stats.name.match(/^\d*/)[0]].api_key + '.swf';
+          shipname = map.id[id].api_key + '.swf';
         };
       } else {
         // ship
-        name = stats.name;
+        shipname = stats.name;
       };
 
-      if (!swap.ship[name]) {
-        swap.ship[name] = { ship: {}, voice: {} };
-        swap.ship[name].ship[stats.sha] = stats;
-      } else if (!swap.ship[name].ship[stats.sha]) {
-        swap.ship[name].ship[stats.sha] = stats;
-      };
+      swap(['ship', shipname, 'image', stats.sha], statsInfo, addInputNum);
     };
-  } else if (stats.name.match(/\w*\.mp3/)) {
-    let name;
+  } else if (stats.name.match(/\.mp3$/)) {
+    let shipname;
     if (stats.path[0].match(/\/MP3\//)) {
       // old voice
-      let id = stats.path[0].match(/MP3_\d{8}\/(\d{1,4})/)[1];
-      if (stats.path[0].match(/\/MP3_(\d{8})/)[1] < 20140131 && mistPool[id]) {
-        name = mistPool[id].ship_eng_name;
-      } else if (specialPool[id]) {
-        name = specialPool[id].ship_eng_name;
+      let id = stats.path[0].match(/MP3_\d{8}\/(\d*)/)[1];
+      if (stats.path[0].match(/MP3_(\d{8})/)[1] < 20140131 && map.mist[id]) {
+        shipname = map.mist[id].ship_eng_name;
+      } else if (map.special[id]) {
+        shipname = map.special[id].ship_eng_name;
       } else {
-        name = idPool[id].api_key + '.swf';
+        shipname = map.id[id].api_key + '.swf';
       };
     } else {
       // voice
-      name = stats.path[0].match(/kc[a-z]{12}/)[0].slice(2) + '.swf';
+      shipname = stats.path[0].match(/kc([a-z]{12})/)[1] + '.swf';
     };
 
-    if (!swap.ship[name]) {
-      swap.ship[name] = { ship: {}, voice: {} };
-      swap.ship[name].voice[stats.name] = {};
-      swap.ship[name].voice[stats.name][stats.sha] = stats;
-    } else if (!swap.ship[name].voice[stats.name]) {
-      swap.ship[name].voice[stats.name] = {};
-      swap.ship[name].voice[stats.name][stats.sha] = stats;
-    } else if (!swap.ship[name].voice[stats.name][stats.sha]) {
-      swap.ship[name].voice[stats.name][stats.sha] = stats;
-    };
+    swap(['ship', shipname, 'voice', stats.name, stats.sha], statsInfo, addInputNum);
   };
 
   callback();
 };
 
+const swap = (keyPool, value, callback) => {
+  let tmp = swap;
+  keyPool.forEach((key, i) => {
+    if (!tmp[key]) {
+      tmp[key] = {};
+    };
+
+    if (++i === keyPool.length) {
+      if (tmp[key].sha) {
+        if (tmp[key].md5 !== value.md5) {
+          throw new Error('collisions found');
+        } else if (tmp[key].updated_at > value.updated_at) {
+          tmp[key] = value;
+        };
+      } else {
+        tmp[key] = value;
+      };
+      callback();
+    } else {
+      tmp = tmp[key];
+    };
+  });
+};
+
 const ending = () => {
-  kancolle = { ship: [], core: [], bgm: [] };
   for (let i in swap.ship) {
     let ship = {
       name: i,
-      api_key: i.match('[a-z]{12}') ? i.match('[a-z]{12}')[0] : null,
+      api_key: i.match(/[a-z]{12}/) ? i.match(/[a-z]{12}/)[0] : null,
       version: [],
       voice: []
     };
 
-    ship.ship_name = keyPool[ship.api_key || ship.name] ? keyPool[ship.api_key || ship.name].ship_name : [null, null];
-    ship.ship_id = keyPool[ship.api_key || ship.name] ? keyPool[ship.api_key || ship.name].ship_id : null;
+    let id = ship.api_key || ship.name;
+    ship.ship_name = map.key[id] ? map.key[id].ship_name : [null, null];
+    ship.ship_id = map.key[id] ? map.key[id].ship_id : null;
 
-    for (let j in swap.ship[i].ship) {
-      ship.version.push(swap.ship[i].ship[j]);
-      totalSize += swap.ship[i].ship[j].size;
+    for (let j in swap.ship[i].image) {
+      ship.version.push(swap.ship[i].image[j]);
+      num.size += swap.ship[i].image[j].size;
+      num.output++;
     };
 
     for (let j in swap.ship[i].voice) {
@@ -136,7 +159,8 @@ const ending = () => {
 
       for (let k in swap.ship[i].voice[j]) {
         voice.version.push(swap.ship[i].voice[j][k]);
-        totalSize += swap.ship[i].voice[j][k].size;
+        num.size+= swap.ship[i].voice[j][k].size;
+        num.output++;
       };
 
       ship.voice.push(voice);
@@ -153,7 +177,8 @@ const ending = () => {
 
     for (let j in swap.core[i]) {
       core.version.push(swap.core[i][j]);
-      totalSize += swap.core[i][j].size;
+      num.size += swap.core[i][j].size;
+      num.output++;
     };
 
     kancolle.core.push(core);
@@ -167,7 +192,8 @@ const ending = () => {
 
     for (let j in swap.bgm[i]) {
       bgm.version.push(swap.bgm[i][j]);
-      totalSize += swap.bgm[i][j].size;
+      num.size += swap.bgm[i][j].size;
+      num.output++;
     };
 
     kancolle.bgm.push(bgm);
@@ -176,7 +202,11 @@ const ending = () => {
   fs.writeFile(dbAddr, JSON.stringify(kancolle), (err) => {
     if (err) throw err;
     console.log('done');
-    console.log('total: ' + totalSize / 1048576 + ' mb');
+    console.log('total file: ' + num.all);
+    console.log('total size: ' + num.size);
+    console.log('origin: ' + num.origin);
+    console.log('input: ' + num.input);
+    console.log('output: ' + num.output);
   });
 };
 
@@ -191,12 +221,12 @@ fs.readFile('list/shipname', (err, nameList) => {
       specialList.split('\n').forEach((name) => {
         name = name.split(',');
         if (name[0]) {
-          keyPool[name[0]] = {
+          map.key[name[0]] = {
             ship_name: [name[2] || '', name[3] || ''],
             ship_id: name[1] || ''
           };
 
-          specialPool[name[1]] = {
+          map.special[name[1]] = {
             ship_eng_name: name[0],
             ship_name: [name[2] || '', name[3] || ''],
             ship_id: name[1]
@@ -208,12 +238,12 @@ fs.readFile('list/shipname', (err, nameList) => {
       mistList.split('\n').forEach((name) => {
         name = name.split(',');
         if (name[0]) {
-          keyPool[name[0]] = {
+          map.key[name[0]] = {
             ship_name: [name[2] || '', name[3] || ''],
             ship_id: name[1] || ''
           };
 
-          mistPool[name[1]] = {
+          map.mist[name[1]] = {
             ship_eng_name: name[0],
             ship_name: [name[2] || '', name[3] || ''],
             ship_id: name[1]
@@ -225,92 +255,96 @@ fs.readFile('list/shipname', (err, nameList) => {
       nameList.split('\n').forEach((name) => {
         name = name.split(',');
         if (name[0]) {
-          keyPool[name[0]] = {
+          map.key[name[0]] = {
             ship_name: [name[2] || '', name[3] || ''],
             ship_id: name[1] || ''
           };
 
-          idPool[name[1]] = {
+          map.id[name[1]] = {
             api_key: name[0]
           };
         };
       });
 
-      fs.readFile(dbAddr, (err, data) => {
-        let kan = {};
-        try {
-          kan = JSON.parse(data);
-        } catch (e) {
-          console.log('file not found');
-        };
+      let kan = {};
+      try {
+        kan = require('./' + dbAddr);
+      } catch (e) {
+        console.log('origin db not found');
+      };
 
-        kancolle.ship = kan.ship || [];
-        kancolle.core = kan.core || [];
-        kancolle.bgm = kan.bgm || [];
+      kancolle.ship = kan.ship || [];
+      kancolle.core = kan.core || [];
+      kancolle.bgm = kan.bgm || [];
 
-        kancolle.ship.forEach((i) => {
-          swap.ship[i.name] = { ship: {}, voice: {} };
-          i.version.forEach((j) => {
-            swap.ship[i.name].ship[j.sha] = {
-              path: j.path,
-              size: j.size,
-              md5: j.md5,
-              sha: j.sha,
-              updated_at: j.updated_at
-            };
-          });
+      let addOriginNum = () => {
+        num.origin++;
+      };
 
-          i.voice.forEach((j) => {
-            swap.ship[i.name].voice[j.name] = {};
-
-            j.version.forEach((k) => {
-              swap.ship[i.name].voice[j.name][k.sha] = {
-                path: k.path,
-                size: k.size,
-                md5: k.md5,
-                sha: k.sha,
-                updated_at: j.updated_at
-              };
-            });
-          });
+      kancolle.ship.forEach((i) => {
+        i.version.forEach((j) => {
+          swap(['ship', i.name, 'image', j.sha], {
+            path: j.path,
+            size: j.size,
+            md5: j.md5,
+            sha: j.sha,
+            updated_at: j.updated_at
+          }, addOriginNum);
         });
 
-        kancolle.core.forEach((i) => {
-          swap.core[i.name] = {};
-          i.version.forEach((j) => {
-            swap.core[i.name][j.sha] = {
-              path: j.path,
-              size: j.size,
-              md5: j.md5,
-              sha: j.sha,
-              updated_at: j.updated_at
-            };
+        i.voice.forEach((j) => {
+          j.version.forEach((k) => {
+            swap(['ship', i.name, 'voice', j.name, k.sha], {
+              path: k.path,
+              size: k.size,
+              md5: k.md5,
+              sha: k.sha,
+              updated_at: k.updated_at
+            }, addOriginNum);
           });
         });
+      });
 
-        kancolle.bgm.forEach((i) => {
-          swap.bgm[i.name] = {};
-          i.version.forEach((j) => {
-            swap.bgm[i.name][j.sha] = {
-              path: j.path,
-              size: j.size,
-              md5: j.md5,
-              sha: j.sha,
-              updated_at: j.updated_at
-            };
-          });
+      kancolle.core.forEach((i) => {
+        i.version.forEach((j) => {
+          swap(['core', i.name, j.sha], {
+            path: j.path,
+            size: j.size,
+            md5: j.md5,
+            sha: j.sha,
+            updated_at: j.updated_at
+          }, addOriginNum);
         });
+      });
 
-        let walker = walk.walk(backupAddr);
+      kancolle.bgm.forEach((i) => {
+        i.version.forEach((j) => {
+          swap(['bgm', i.name, j.sha], {
+            path: j.path,
+            size: j.size,
+            md5: j.md5,
+            sha: j.sha,
+            updated_at: j.updated_at
+          }, addOriginNum);
+        });
+      });
 
-        walker.on('file', (root, fileStats, next) => {
+      kancolle = { ship: [], core: [], bgm: [] };
+
+      let walker = walk.walk(backupAddr);
+
+      walker.on('file', (root, fileStats, next) => {
+        if (fileStats.name.match(/^.*\.(swf|mp3)/)) {
+          num.all++;
           status.locked++;
+          root = root.replace(/\/\/*\//g, '/');
           let path = root + '/' + fileStats.name;
           console.log('locked: ' + status.locked + ', path: ' + path);
+
           hash(path, (hashData) => {
             pickup({
-              path: [root.replace(/\/\/*\//g, '/'), fileStats.name],
-              name: fileStats.name,
+              path: [root, fileStats.name],
+              name: fileStats.name.match(/^.*\.(swf|mp3)/)[0],
               size: fileStats.size,
               md5: hashData.md5,
               sha: hashData.sha,
@@ -322,12 +356,14 @@ fs.readFile('list/shipname', (err, nameList) => {
               };
             });
           });
-          next();
-        });
+        } else {
+          console.log('data not matched: ' + root + '/' + fileStats.name);
+        };
+        next();
+      });
 
-        walker.on('end', () => {
-          status.end = true;
-        });
+      walker.on('end', () => {
+        status.end = true;
       });
     });
   });
