@@ -17,3 +17,9 @@ backup tools for kantai collection
 
 ## make diff tree json
 `node chk.js [backup dir]`
+
+## export backup data
+`node exp.js [kancolle.json] [export address]`
+
+## testing
+`node test.js [kancolle.json] [kancolle.db.json]`
