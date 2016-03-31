@@ -110,22 +110,23 @@ const pickup = (stats, callback) => {
 
 const swap = (keyPool, value, callback) => {
   let tmp = swap;
-  keyPool.forEach((key, i) => {
+  keyPool.forEach((key, num) => {
     if (!tmp[key]) {
       tmp[key] = {};
     };
 
-    if (++i === keyPool.length) {
+    if (++num === keyPool.length) {
       if (tmp[key].sha) {
         if (tmp[key].md5 !== value.md5) {
           throw new Error('collisions found');
         } else if (tmp[key].updated_at > value.updated_at) {
           tmp[key] = value;
+          callback();
         };
       } else {
         tmp[key] = value;
+        callback();
       };
-      callback();
     } else {
       tmp = tmp[key];
     };
@@ -348,7 +349,7 @@ fs.readFile('list/shipname', (err, nameList) => {
               size: fileStats.size,
               md5: hashData.md5,
               sha: hashData.sha,
-              updated_at: fileStats.mtime.getTime()
+              updated_at: fileStats.mtime.getTime() / 1000
             }, () => {
               status.locked--;
               if (status.end && status.locked === 0) {
